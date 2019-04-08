@@ -50,6 +50,7 @@
             <Generator>MSBuild:Compile</Generator>
             <SubType>Designer</SubType>
         </ApplicationDefinition>
+        <Page Include="BezierDrawingArea.xaml" />
         <Page Include="MainWindow.xaml">
             <Generator>MSBuild:Compile</Generator>
             <SubType>Designer</SubType>
@@ -59,7 +60,9 @@
             <SubType>Code</SubType>
         </Compile>
         <Compile Include="BezierDrawer.cs" />
-        <Compile Include="BezierDrawingArea.cs" />
+        <Compile Include="BezierDrawingArea.xaml.cs">
+          <DependentUpon>BezierDrawingArea.xaml</DependentUpon>
+        </Compile>
         <Compile Include="MainWindow.xaml.cs">
             <DependentUpon>MainWindow.xaml</DependentUpon>
             <SubType>Code</SubType>

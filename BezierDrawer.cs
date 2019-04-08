@@ -14,11 +14,11 @@ namespace BezierCurve
         private static readonly int PrimaryLinePointsCount = (int) Math.Ceiling(1.0 / PointStep);
         private static readonly Random Rnd = new Random();
 
-        private readonly Point[] _splinePoints;
+        private readonly Point[] _splineBasePoints;
         
         private readonly Point[] _workingPointSet;
         
-        private readonly Dictionary<(int, int), Pen> _tempLinesPens = new Dictionary<(int, int), Pen>();
+        private readonly Dictionary<(int, int), Pen> _intermediateLinesPens = new Dictionary<(int, int), Pen>();
         
         private readonly List<Point> _primaryLine = new List<Point>(PrimaryLinePointsCount);
         
@@ -30,13 +30,13 @@ namespace BezierCurve
 
         public BezierDrawer(IEnumerable<Point> splinePoints)
         {
-            _splinePoints = splinePoints.ToArray();
+            _splineBasePoints = splinePoints.ToArray();
 
-            if (_splinePoints.Length < 2)
+            if (_splineBasePoints.Length < 2)
                 throw new ArgumentOutOfRangeException(nameof(splinePoints), "Spline points must contain at least 2 elements");
             
-            _workingPointSet = new Point[_splinePoints.Length];
-            _primaryLine.Add(_splinePoints[0]);
+            _workingPointSet = new Point[_splineBasePoints.Length];
+            _primaryLine.Add(_splineBasePoints[0]);
         }
 
         public bool MoveToNextPoint()
@@ -46,35 +46,42 @@ namespace BezierCurve
             
             _progress = Math.Min(_progress + PointStep, 1);
             SetupBezierLines(null);
-            _primaryLine.Add(Finished ? _splinePoints.Last() : _workingPointSet[0]);
+            _primaryLine.Add(Finished ? _splineBasePoints.Last() : _workingPointSet[0]);
 
             return true;
         }
 
-        public void Draw(DrawingContext drawingContext, bool drawTemporaryLines)
+        public IReadOnlyList<Point> BuildSpline()
         {
-            if (drawTemporaryLines)
-                SetupBezierLines(DrawTemporaryLine);
+            while (MoveToNextPoint()) { }
+
+            return PrimaryLinePoints;
+        }
+
+        public void Draw(DrawingContext drawingContext, bool drawIntermediateLines)
+        {
+            if (drawIntermediateLines)
+                SetupBezierLines(DrawIntermediateLine);
             
             for (var i = 1; i < _primaryLine.Count; i++)
                 drawingContext.DrawLine(PrimaryLinePen, _primaryLine[i - 1], _primaryLine[i]);
 
-            if (_primaryLine.Last() != _splinePoints.Last())
+            if (_primaryLine.Last() != _splineBasePoints.Last())
                 drawingContext.DrawEllipse(Brushes.Green, null, _primaryLine[_primaryLine.Count - 1], 4, 4);
 
-            if (drawTemporaryLines)
+            if (drawIntermediateLines)
             {
-                foreach (var basePoint in _splinePoints)
+                foreach (var basePoint in _splineBasePoints)
                     drawingContext.DrawEllipse(Brushes.Red, null, basePoint, 4, 4);
             }
 
-            void DrawTemporaryLine((int lineLevel, int lineIndex) lineDescriptor, Point lineStart, Point lineEnd) =>
-                drawingContext.DrawLine(GetPenForTemporaryLine(lineDescriptor), lineStart, lineEnd);
+            void DrawIntermediateLine((int lineLevel, int lineIndex) lineDescriptor, Point lineStart, Point lineEnd) =>
+                drawingContext.DrawLine(GetPenForIntermediateLine(lineDescriptor), lineStart, lineEnd);
         }
 
         private void SetupBezierLines(Action<(int, int), Point, Point> actionForEachLine)
         {
-            Array.Copy(_splinePoints, _workingPointSet, _workingPointSet.Length);
+            Array.Copy(_splineBasePoints, _workingPointSet, _workingPointSet.Length);
             
             for (var lineLevel = 1; lineLevel < _workingPointSet.Length; lineLevel++)
             for (var lineIndex = 0; lineIndex < _workingPointSet.Length - lineLevel; lineIndex++)
@@ -88,13 +95,13 @@ namespace BezierCurve
             }
         }
 
-        private Pen GetPenForTemporaryLine((int lineLevel, int lineIndex) lineDescriptor)
+        private Pen GetPenForIntermediateLine((int lineLevel, int lineIndex) lineDescriptor)
         {
-            if (_tempLinesPens.TryGetValue(lineDescriptor, out var pen))
+            if (_intermediateLinesPens.TryGetValue(lineDescriptor, out var pen))
                 return pen;
             
             var color = Color.FromRgb((byte) Rnd.Next(256), (byte) Rnd.Next(256), (byte) Rnd.Next(256));
-            _tempLinesPens[lineDescriptor] = pen = new Pen(new SolidColorBrush(color), 1);
+            _intermediateLinesPens[lineDescriptor] = pen = new Pen(new SolidColorBrush(color), 1);
             pen.Freeze();
             return pen;
         }

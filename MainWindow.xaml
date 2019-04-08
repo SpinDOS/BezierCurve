@@ -19,7 +19,7 @@
     <Button Grid.Row="0" Click="btnStop_OnClick">Stop</Button>
     <Button Grid.Row="0" Click="btnDrawBezier_OnClick">Draw Bezier Curve</Button>
     <Button Grid.Row="1" Click="btnClear_OnClick">Clear</Button>
-    <Border Grid.Row="2" Background="Transparent" BorderThickness="1" BorderBrush="Black" Margin="10" MouseDown="BezierDrawer_OnMouseDown">
+    <Border Grid.Row="2" Background="Transparent" BorderThickness="1" BorderBrush="Black" Margin="10">
         <bezierCurve:BezierDrawingArea x:Name="bezierDrawingArea"/>
     </Border>
 </Grid>

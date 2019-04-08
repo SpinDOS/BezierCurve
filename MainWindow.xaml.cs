@@ -19,13 +19,14 @@ namespace BezierCurve
             FillWithSampleData();
         }
 
-        private void btnStop_OnClick(object sender, RoutedEventArgs e)
-        {
-            _cancellationTokenSource?.Cancel();
-        }
-
         private async void btnDrawBezier_OnClick(object sender, RoutedEventArgs e)
         {
+            if (bezierDrawingArea.SplinePoints.Count < 2)
+            {
+                MessageBox.Show("Fill at least 2 points for bezier curve building");
+                return;
+            }
+            
             var btn = (Button) sender;
             _cancellationTokenSource = new CancellationTokenSource();
 
@@ -36,25 +37,25 @@ namespace BezierCurve
             _cancellationTokenSource = null;
         }
 
+        private void btnStop_OnClick(object sender, RoutedEventArgs e)
+        {
+            _cancellationTokenSource?.Cancel();
+        }
+
         private void btnClear_OnClick(object sender, RoutedEventArgs e)
         {
             _cancellationTokenSource?.Cancel();
-            bezierDrawingArea.Clear();   
-        }
-
-        private void BezierDrawer_OnMouseDown(object sender, MouseButtonEventArgs e)
-        {
-            bezierDrawingArea.AddOrRemoveSplinePoint(e.GetPosition(bezierDrawingArea));
+            bezierDrawingArea.SplinePoints.Clear();   
         }
 
         private void FillWithSampleData()
         {
-            bezierDrawingArea.AddOrRemoveSplinePoint(new Point(170, 500));
-            bezierDrawingArea.AddOrRemoveSplinePoint(new Point(20, 10));
-            bezierDrawingArea.AddOrRemoveSplinePoint(new Point(770, 25));
-            bezierDrawingArea.AddOrRemoveSplinePoint(new Point(1020, 500));
-            bezierDrawingArea.AddOrRemoveSplinePoint(new Point(1170, 100));
-            bezierDrawingArea.AddOrRemoveSplinePoint(new Point(360, 200));
+            bezierDrawingArea.SplinePoints.Add(new Point(170, 500));
+            bezierDrawingArea.SplinePoints.Add(new Point(20, 10));
+            bezierDrawingArea.SplinePoints.Add(new Point(770, 25));
+            bezierDrawingArea.SplinePoints.Add(new Point(1020, 500));
+            bezierDrawingArea.SplinePoints.Add(new Point(1170, 100));
+            bezierDrawingArea.SplinePoints.Add(new Point(360, 200));
         }
     }
 }
