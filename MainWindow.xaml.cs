@@ -1,7 +1,7 @@
 ﻿using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 
 namespace BezierCurve
 {
@@ -21,7 +21,7 @@ namespace BezierCurve
 
         private async void btnDrawBezier_OnClick(object sender, RoutedEventArgs e)
         {
-            if (bezierDrawingArea.SplinePoints.Count < 2)
+            if (bezierDrawingArea.SplineBasePoints.Count < 2)
             {
                 MessageBox.Show("Fill at least 2 points for bezier curve building");
                 return;
@@ -42,20 +42,24 @@ namespace BezierCurve
             _cancellationTokenSource?.Cancel();
         }
 
-        private void btnClear_OnClick(object sender, RoutedEventArgs e)
+        private async void btnClear_OnClick(object sender, RoutedEventArgs e)
         {
             _cancellationTokenSource?.Cancel();
-            bezierDrawingArea.SplinePoints.Clear();   
+
+            while (bezierDrawingArea.DrawingInProgress)
+                await Task.Yield();
+            
+            bezierDrawingArea.SplineBasePoints.Clear();   
         }
 
         private void FillWithSampleData()
         {
-            bezierDrawingArea.SplinePoints.Add(new Point(170, 500));
-            bezierDrawingArea.SplinePoints.Add(new Point(20, 10));
-            bezierDrawingArea.SplinePoints.Add(new Point(770, 25));
-            bezierDrawingArea.SplinePoints.Add(new Point(1020, 500));
-            bezierDrawingArea.SplinePoints.Add(new Point(1170, 100));
-            bezierDrawingArea.SplinePoints.Add(new Point(360, 200));
+            bezierDrawingArea.SplineBasePoints.Add(new Point(170, 500));
+            bezierDrawingArea.SplineBasePoints.Add(new Point(20, 10));
+            bezierDrawingArea.SplineBasePoints.Add(new Point(770, 25));
+            bezierDrawingArea.SplineBasePoints.Add(new Point(1020, 500));
+            bezierDrawingArea.SplineBasePoints.Add(new Point(1170, 100));
+            bezierDrawingArea.SplineBasePoints.Add(new Point(360, 200));
         }
     }
 }

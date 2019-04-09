@@ -10,7 +10,6 @@ namespace BezierCurve
     {
         private const double PointStep = 0.0005;
         
-        private static readonly Pen PrimaryLinePen = InitPrimaryLinePen();
         private static readonly int PrimaryLinePointsCount = (int) Math.Ceiling(1.0 / PointStep);
         private static readonly Random Rnd = new Random();
 
@@ -28,12 +27,12 @@ namespace BezierCurve
 
         public IReadOnlyList<Point> PrimaryLinePoints => _primaryLine;
 
-        public BezierDrawer(IEnumerable<Point> splinePoints)
+        public BezierDrawer(IEnumerable<Point> splineBasePoints)
         {
-            _splineBasePoints = splinePoints.ToArray();
+            _splineBasePoints = splineBasePoints.ToArray();
 
             if (_splineBasePoints.Length < 2)
-                throw new ArgumentOutOfRangeException(nameof(splinePoints), "Spline points must contain at least 2 elements");
+                throw new ArgumentOutOfRangeException(nameof(splineBasePoints), "Spline points must contain at least 2 elements");
             
             _workingPointSet = new Point[_splineBasePoints.Length];
             _primaryLine.Add(_splineBasePoints[0]);
@@ -58,25 +57,14 @@ namespace BezierCurve
             return PrimaryLinePoints;
         }
 
-        public void Draw(DrawingContext drawingContext, bool drawIntermediateLines)
+        public void DrawIntermediateLines(DrawingContext drawingContext)
         {
-            if (drawIntermediateLines)
-                SetupBezierLines(DrawIntermediateLine);
-            
-            for (var i = 1; i < _primaryLine.Count; i++)
-                drawingContext.DrawLine(PrimaryLinePen, _primaryLine[i - 1], _primaryLine[i]);
+            SetupBezierLines(DrawIntermediateLine);
 
-            if (_primaryLine.Last() != _splineBasePoints.Last())
-                drawingContext.DrawEllipse(Brushes.Green, null, _primaryLine[_primaryLine.Count - 1], 4, 4);
-
-            if (drawIntermediateLines)
+            void DrawIntermediateLine((int lineLevel, int lineIndex) lineDescriptor, Point lineStart, Point lineEnd)
             {
-                foreach (var basePoint in _splineBasePoints)
-                    drawingContext.DrawEllipse(Brushes.Red, null, basePoint, 4, 4);
-            }
-
-            void DrawIntermediateLine((int lineLevel, int lineIndex) lineDescriptor, Point lineStart, Point lineEnd) =>
                 drawingContext.DrawLine(GetPenForIntermediateLine(lineDescriptor), lineStart, lineEnd);
+            }
         }
 
         private void SetupBezierLines(Action<(int, int), Point, Point> actionForEachLine)
@@ -110,18 +98,5 @@ namespace BezierCurve
             new Point(GetInterpolated(lineStart.X, lineEnd.X, t), GetInterpolated(lineStart.Y, lineEnd.Y, t));
         
         private static double GetInterpolated(double start, double end, double t) => start + (end - start) * t;
-        
-        private static Pen InitPrimaryLinePen()
-        {
-            var pen = new Pen(Brushes.Black, 2)
-            {
-                LineJoin = PenLineJoin.Round,
-                StartLineCap = PenLineCap.Round,
-                EndLineCap = PenLineCap.Round,
-            };
-            
-            pen.Freeze();
-            return pen;
-        }
     }
 }

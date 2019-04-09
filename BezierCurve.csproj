@@ -60,9 +60,16 @@
             <SubType>Code</SubType>
         </Compile>
         <Compile Include="BezierDrawer.cs" />
+        <Compile Include="BezierDrawingArea.MouseCapture.cs">
+          <DependentUpon>BezierDrawingArea.xaml</DependentUpon>
+        </Compile>
+        <Compile Include="BezierDrawingArea.PointsAndLabels.cs">
+          <DependentUpon>BezierDrawingArea.xaml</DependentUpon>
+        </Compile>
         <Compile Include="BezierDrawingArea.xaml.cs">
           <DependentUpon>BezierDrawingArea.xaml</DependentUpon>
         </Compile>
+        <Compile Include="FreezableCollection.cs" />
         <Compile Include="MainWindow.xaml.cs">
             <DependentUpon>MainWindow.xaml</DependentUpon>
             <SubType>Code</SubType>

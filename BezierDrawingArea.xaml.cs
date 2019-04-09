@@ -1,14 +1,10 @@
-using System;
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Shapes;
 
 namespace BezierCurve
 {
@@ -16,180 +12,72 @@ namespace BezierCurve
     {
         private const double EllipseRadius = 4;
         
-        private int _capturedPointIndex = -1;
-        private bool _isMouseMove;
-        private Point _initialMousePosition;
+        private static readonly Pen PrimaryLinePen = InitPrimaryLinePen();
+        
+        private readonly FreezableCollection<Point> _splineBasePoints = new FreezableCollection<Point>();
         
         private BezierDrawer _bezierDrawer;
 
         public BezierDrawingArea()
         {
             InitializeComponent();
-            SplinePoints.CollectionChanged += SplinePointsOnCollectionChanged;
+            _splineBasePoints.CollectionChanged += SplinePointsOnCollectionChanged;
         }
 
-        public bool DrawingInProgress { get; private set; }
-        
-        public ObservableCollection<Point> SplinePoints { get; } = new ObservableCollection<Point>();
+        public bool DrawingInProgress => _splineBasePoints.Frozen;
+
+        public ObservableCollection<Point> SplineBasePoints => _splineBasePoints;
 
         public async Task DrawBezierCurve(CancellationToken cancellationToken)
         {
-            var bezierDrawer = _bezierDrawer = new BezierDrawer(SplinePoints);
-            DrawingInProgress = true;
-            
-            while (!cancellationToken.IsCancellationRequested && bezierDrawer.MoveToNextPoint())
+            using (_splineBasePoints.Frost())
             {
-                InvalidateVisual();
-                try { await Task.Delay(5, cancellationToken); }
-                catch (TaskCanceledException) { }
+                var bezierDrawer = _bezierDrawer = new BezierDrawer(_splineBasePoints);
+                while (!cancellationToken.IsCancellationRequested && bezierDrawer.MoveToNextPoint())
+                {
+                    InvalidateVisual();
+                    try { await Task.Delay(5, cancellationToken); }
+                    catch (TaskCanceledException) { }
+                }
             }
-
-            DrawingInProgress = false;
+            
             InvalidateVisual();
         }
         
         protected override void OnRender(DrawingContext drawingContext)
         {
+            RenderBezierLine(drawingContext, _bezierDrawer);
             base.OnRender(drawingContext);
-            _bezierDrawer?.Draw(drawingContext, DrawingInProgress);
         }
 
-        private void SplinePointsOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        private void RenderBezierLine(DrawingContext drawingContext, BezierDrawer bezierDrawer)
         {
-            switch (e.Action)
-            {
-                case NotifyCollectionChangedAction.Add:
-                    _canvas.Children.Insert(e.NewStartingIndex * 2, CreateLabel());
-                    _canvas.Children.Insert(e.NewStartingIndex * 2 + 1, CreateEllipse());
-                    FixPositions(e.NewStartingIndex);
-                    FixLabels(e.NewStartingIndex);
-                    break;
-                case NotifyCollectionChangedAction.Reset:
-                    _canvas.Children.Clear();
-                    _bezierDrawer = null;
-                    InvalidateVisual();
-                    break;
-                case NotifyCollectionChangedAction.Remove:
-                    _canvas.Children.RemoveAt(e.OldStartingIndex * 2);
-                    _canvas.Children.RemoveAt(e.OldStartingIndex * 2);
-                    FixLabels(e.OldStartingIndex);
-                    break;
-                case NotifyCollectionChangedAction.Replace:
-                    FixPositions(e.NewStartingIndex);
-                    break;
-                case NotifyCollectionChangedAction.Move:
-                    var indexToRemove = e.OldStartingIndex * 2;
-                    
-                    var label = _canvas.Children[indexToRemove];
-                    _canvas.Children.RemoveAt(indexToRemove);
-                    var ellipse = _canvas.Children[indexToRemove];
-                    _canvas.Children.RemoveAt(indexToRemove);
-                    
-                    _canvas.Children.Insert(e.NewStartingIndex * 2, label);
-                    _canvas.Children.Insert(e.NewStartingIndex * 2 + 1, ellipse);
-
-                    var minIndex = Math.Min(e.NewStartingIndex, e.OldStartingIndex);
-                    var maxIndex = Math.Max(e.NewStartingIndex, e.OldStartingIndex);
-                    
-                    FixLabels(minIndex, maxIndex + 1);
-                    break;
-            }
-        }
-
-        protected override void OnMouseDown(MouseButtonEventArgs e)
-        {
-            base.OnMouseDown(e);
-            if (DrawingInProgress || e.ChangedButton != MouseButton.Left || !this.CaptureMouse())
+            if (bezierDrawer == null)
                 return;
             
-            _isMouseMove = false;
-            var mousePosition = _initialMousePosition = e.GetPosition(this);
+            if (DrawingInProgress)
+                bezierDrawer.DrawIntermediateLines(drawingContext);
             
-            var nearestPoint = SplinePoints.OrderBy(point => DistanceSquare(point, mousePosition)).FirstOrDefault();
-
-            if (IsNear(mousePosition, nearestPoint))
-                _capturedPointIndex = SplinePoints.IndexOf(nearestPoint);
-        }
-
-        protected override void OnMouseMove(MouseEventArgs e)
-        {
-            base.OnMouseMove(e);
-            if (IsMouseCaptured)
-                MovePointToMouse(e);
-        }
-
-        protected override void OnMouseUp(MouseButtonEventArgs e)
-        {
-            base.OnMouseUp(e);
-            if (!IsMouseCaptured)
-                return;
-
-            MovePointToMouse(e);
-            this.ReleaseMouseCapture();
-
-            var capturedPointIndex = _capturedPointIndex;
-            _capturedPointIndex = -1;
-
-            if (_isMouseMove)
-                return;
+            var primaryLine = bezierDrawer.PrimaryLinePoints;
             
-            if (capturedPointIndex < 0)
-                SplinePoints.Add(e.GetPosition(this));
-            else
-                SplinePoints.RemoveAt(capturedPointIndex);
+            for (var i = 1; i < primaryLine.Count; i++)
+                drawingContext.DrawLine(PrimaryLinePen, primaryLine[i - 1], primaryLine[i]);
+                
+            if (!bezierDrawer.Finished)
+                drawingContext.DrawEllipse(Brushes.Green, null, primaryLine.Last(), EllipseRadius, EllipseRadius);
         }
-
-        private void MovePointToMouse(MouseEventArgs e)
-        {
-            if (_isMouseMove && _capturedPointIndex < 0) // no need to calculate anything
-                return;
-            
-            var mousePosition = e.GetPosition(this);
-            _isMouseMove = _isMouseMove || !IsNear(_initialMousePosition, mousePosition);
-
-            if (_capturedPointIndex < 0)
-                return;
-            
-            var x = Math.Max(0, Math.Min(this.ActualWidth, mousePosition.X));
-            var y = Math.Max(0, Math.Min(this.ActualHeight, mousePosition.Y));
-            SplinePoints[_capturedPointIndex] = new Point(x, y);
-        }
-
-        private void FixPositions(int index)
-        {
-            var point = SplinePoints[index];
-            
-            var label = (Label) _canvas.Children[2 * index];
-            label.SetValue(Canvas.LeftProperty, point.X);
-            label.SetValue(Canvas.TopProperty, point.Y);
-
-            var ellipse = (Ellipse) _canvas.Children[2 * index + 1];
-            ellipse.SetValue(Canvas.LeftProperty, point.X - EllipseRadius);
-            ellipse.SetValue(Canvas.TopProperty, point.Y - EllipseRadius);
-        }
-
-        private void FixLabels(int startIndex) => FixLabels(startIndex, SplinePoints.Count);
-
-        private void FixLabels(int startIndex, int endIndex)
-        {
-            for (var i = startIndex; i < endIndex; i++)
-            {
-                var label = (Label) _canvas.Children[2 * i];
-                label.Content = (i + 1).ToString();
-            }
-        }
-
-        private static Label CreateLabel() => new Label();
         
-        private static Ellipse CreateEllipse() =>
-            new Ellipse { Fill = Brushes.Red, Height = 2 * EllipseRadius, Width = 2 * EllipseRadius, };
-
-        private static double DistanceSquare(Point point1, Point point2) =>
-            Square(point2.X - point1.X) + Square(point2.Y - point1.Y);
-
-        private static double Square(double x) => x * x;
-
-        private static bool IsNear(Point point1, Point point2) => 
-            DistanceSquare(point1, point2) <= (2 * EllipseRadius) * (2 * EllipseRadius);
+        private static Pen InitPrimaryLinePen()
+        {
+            var pen = new Pen(Brushes.Black, 2)
+            {
+                LineJoin = PenLineJoin.Round,
+                StartLineCap = PenLineCap.Round,
+                EndLineCap = PenLineCap.Round,
+            };
+            
+            pen.Freeze();
+            return pen;
+        }
     }
 }
